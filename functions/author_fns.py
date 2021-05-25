@@ -1,3 +1,6 @@
+import numpy as np
+import igraph
+
 class Author:
     def __init__(self, network_bias:float, walk_bias:float, meet_bias:float, beta:float, gender='W'):
         '''
