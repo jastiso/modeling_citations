@@ -34,8 +34,8 @@ class Author:
         gender = gender.upper()
         if (gender != 'W') & (gender != 'M'):
             raise Exception('Gender should be W or M')
-        if (beta < 0.) | (beta > 1.):
-            raise Exception('Beta should be between 0 and 1')
+        if (beta < 0.):
+            raise Exception('Beta should be positive')
         if (meet_bias < 0.) | (meet_bias > 1.):
             raise Exception('Meeting bias should be between 0 and 1')
         if (network_bias < 0.) | (network_bias > 1.):
@@ -236,42 +236,46 @@ class Author:
         A = np.divide(A,A.sum(0))
         
         # incorporate betas to get A_hat
-        A_hat = np.matmul((1 - np.exp(-self.learn_bias))*A,np.linalg.pinv(np.eye(len(unodes)) - np.exp(-self.learn_bias)*A))
+        try:
+            A_hat = np.matmul((1 - np.exp(-self.learn_bias))*A,np.linalg.pinv(np.eye(len(unodes)) - np.exp(-self.learn_bias)*A))
 
-        # threshold
-        A_hatb = A_hat.copy()
-        A_hatb[A_hatb < thr] = 0
-        A_hatb[A_hatb > 0] = 1
-        # get nodes with no edges
-        idx = np.where(A_hatb.sum(0) == 0)[0]
-        sg.delete_vertices(idx.tolist())
-        for e in sg.es():
-            v1 = e.tuple[0]
-            v2 = e.tuple[1]
-            if A_hatb[v1,v2] == 0:
-                sg.delete_edges(e)
-        
-        # combine
-        # first add new nodes
-        for v in sg.vs():
-            if v['oid'] not in self.network.vs['oid']:
-                self.network.add_vertices(1, attributes={'oid':v['oid'],
-                                                          'gender':v['gender']})
-        
-        # then add edges 
-        for e in sg.es():
-            oid_tuple = (sg.vs(e.tuple[0])['oid'][0], sg.vs(e.tuple[1])['oid'][0])
-            v1 = self.network.vs.select(oid_eq=oid_tuple[0])
-            v2 = self.network.vs.select(oid_eq=oid_tuple[1])
-            if (len(v1) > 1) | (len(v2) > 1):
-                raise Exception('Something went wrong - you have multiple nodes with the same oid')
-            new_e = (v1[0].index,v2[0].index)
-            self.network.add_edges([new_e])
-        
-        if debug:
-            return A_hat, A, A_hatb, sg
-        else:
-            return self
+            # threshold
+            A_hatb = A_hat.copy()
+            A_hatb[A_hatb < thr] = 0
+            A_hatb[A_hatb > 0] = 1
+            # get nodes with no edges
+            idx = np.where(A_hatb.sum(0) == 0)[0]
+            sg.delete_vertices(idx.tolist())
+            for e in sg.es():
+                v1 = e.tuple[0]
+                v2 = e.tuple[1]
+                if A_hatb[v1,v2] == 0:
+                    sg.delete_edges(e)
+            
+            # combine
+            # first add new nodes
+            for v in sg.vs():
+                if v['oid'] not in self.network.vs['oid']:
+                    self.network.add_vertices(1, attributes={'oid':v['oid'],
+                                                            'gender':v['gender']})
+            
+            # then add edges 
+            for e in sg.es():
+                oid_tuple = (sg.vs(e.tuple[0])['oid'][0], sg.vs(e.tuple[1])['oid'][0])
+                v1 = self.network.vs.select(oid_eq=oid_tuple[0])
+                v2 = self.network.vs.select(oid_eq=oid_tuple[1])
+                if (len(v1) > 1) | (len(v2) > 1):
+                    raise Exception('Something went wrong - you have multiple nodes with the same oid')
+                new_e = (v1[0].index,v2[0].index)
+                self.network.add_edges([new_e])
+            
+            if debug:
+                return A_hat, A, A_hatb, sg
+            else:
+                return self
+        except:
+            print([self.network_bias, self.walk_bias, self.meet_bias, self.learn_bias])
+            print(A)
 
     
 def compare_nets(a1,a2):
