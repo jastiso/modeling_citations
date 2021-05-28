@@ -231,13 +231,15 @@ class Author:
         nodes = [val['id'] for val in walk.values()]
         unodes = list(set(nodes))
         sg = g.subgraph(g.vs(unodes))
+        if len(sg.clusters()) > 1:
+            raise Exception("Something went wrong, your walk is disconnected")
         A = sg.get_adjacency()
         A = np.array(A.data)
-        A = np.divide(A,A.sum(0))
+        An = np.divide(A,A.sum(0))
         
         # incorporate betas to get A_hat
         try:
-            A_hat = np.matmul((1 - np.exp(-self.learn_bias))*A,np.linalg.pinv(np.eye(len(unodes)) - np.exp(-self.learn_bias)*A))
+            A_hat = np.matmul((1 - np.exp(-self.learn_bias))*An,np.linalg.pinv(np.eye(len(unodes)) - np.exp(-self.learn_bias)*An))
 
             # threshold
             A_hatb = A_hat.copy()
@@ -275,7 +277,10 @@ class Author:
                 return self
         except:
             print([self.network_bias, self.walk_bias, self.meet_bias, self.learn_bias])
+            print(A.sum(0))
             print(A)
+            print(np.isnan(An).any())
+            raise Exception()
 
     
 def compare_nets(a1,a2):
