@@ -283,12 +283,13 @@ class Author:
             raise Exception()
 
     
-def compare_nets(a1,a2):
+def compare_nets(a1,a2,method='soc'):
     '''
     This function will take two author objects, and determine if thier network's are similar enough to meet
     Inputs:
-    a1    an Author object, with a meet bias and a network
-    a2    an Author object with a meet bias and netork
+    a1      an Author object, with a meet bias and a network
+    a2      an Author object with a meet bias and netork
+    method  a string specifying the method of comparison. either 'soc' (social) or 'bi' (biases)
     
     Returns:
     meet12     a boolean, True is a1 will meet with a2, False otherwise
@@ -298,13 +299,22 @@ def compare_nets(a1,a2):
     # type checking
     if not ((isinstance(a1,Author)) and isinstance(a2,Author)):
         raise Exception('You must input two Author objects into this function')
+    if (method != 'soc') & (method != 'bi'):
+        raise Exception('You muse enter a valid comparison method')
+
+    if method == 'soc': 
+        # get node identities
+        n1 = a1.network.vs['oid']
+        n2 = a2.network.vs['oid']
         
-    # get node identities
-    n1 = a1.network.vs['oid']
-    n2 = a2.network.vs['oid']
-    
-    # compare node identities
-    meet12 = sum([x in n2 for x in n1])/len(n1) > a1.meet_bias
-    meet21 = sum([x in n1 for x in n2])/len(n2) > a2.meet_bias
+        # compare node identities
+        meet12 = sum([x in n2 for x in n1])/len(n1) > a1.meet_bias
+        meet21 = sum([x in n1 for x in n2])/len(n2) > a2.meet_bias
+
+    else:
+        bias_diff = (np.abs(a1.network_bias - a2.network_bias) + np.abs(a1.walk_bias - a2.walk_bias) + 
+                    np.abs(a1.meet_bias - a2.meet_bias) + np.abs(np.log(a1.learn_bias) - np.log(a2.learn_bias)))/4
+        meet12 = bias_diff < a1.meet_bias
+        meet21 = bias_diff < a2.meet_bias
     
     return meet12, meet21
