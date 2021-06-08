@@ -287,23 +287,28 @@ class Author:
             return self
 
 
-    def forget(self, walk, g, thr=.1, debug=False):
+    def forget(self, n=10):
         '''
         This function will update and Author object's network and forget nodes that havent
         been viewed recently
 
         Inputs:
-        walk     a dictionary of nodes traversed in a walk (like what is output by self.get_cites())
-                 the dictionary should contain the ID of the node in the original co-author network
-        g        an igraph graph object that generated the walk used for the first input (the .network
-                 property of another author)
-        thr      the threshold to cut edges out of the A_hat matrix
-        debug    if True, it will return the matrices from internal steps
+        thr      the number of nodes to remove
         '''
 
         # normalize memory
-        p = self.memory.values()/sum(self.memory.values())
-
+        p = np.array(list(self.memory.values()))
+        f = 1./sum(p)
+        p = p*f
+        p = 1. - p
+        p = p/sum(p)
+        to_del = np.random.choice(list(self.memory.keys()), p=p, size=(n,), replace=False)
+        # remove from network and memory
+        for i in to_del:
+            self.memory.pop(i)
+        self.network.delete_vertices(to_del)
+        # remap keys to new indices
+        self.memory = dict(zip([v.index for v in self.network.vs()],list(self.memory.values())))
 
 def compare_nets(a1,a2,method='soc'):
     '''
