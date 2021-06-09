@@ -2,7 +2,7 @@ import numpy as np
 import igraph
 
 class Author:
-    def __init__(self, network_bias:float, walk_bias:float, meet_bias:float, beta:float, gender='W'):
+    def __init__(self, network_bias:float, walk_bias:float, meet_bias:float, beta:float, forget_bias:float, gender='W'):
         '''
         Inputs:
             gender          string, 'W' or 'M'
@@ -17,6 +17,8 @@ class Author:
             beta            a scalar float. Determines how this author learns from others. The name beta
                             comes from a model sequence learning, where the parameter beta tuned the
                             steepness of temporal discounting
+            forget_bias     a scalar float that gives the scaling factor for an exponential probability
+                            distribution that determines the number of authors that are forgotten
         '''
         # type checking
         if not(isinstance(beta,float)):
@@ -27,6 +29,8 @@ class Author:
             raise Exception('Network bias should be a float')
         if not(isinstance(walk_bias,float)):
             raise Exception('Walk bias should be a float')
+        if not(isinstance(forget_bias,float)):
+            raise Exception('forget bias should be a float')
         if not(isinstance(gender,str)):
             raise Exception('Gender should be a string, W or M')
 
@@ -36,6 +40,8 @@ class Author:
             raise Exception('Gender should be W or M')
         if (beta < 0.):
             raise Exception('Beta should be positive')
+        if (forget_bias < 0.):
+            raise Exception('forget_bias should be positive')
         if (meet_bias < 0.) | (meet_bias > 1.):
             raise Exception('Meeting bias should be between 0 and 1')
         if (network_bias < 0.) | (network_bias > 1.):
@@ -48,6 +54,7 @@ class Author:
         self.meet_bias = meet_bias
         self.network_bias = network_bias
         self.walk_bias = walk_bias
+        self.forget_bias = forget_bias
 
     def init_network(self, g, node2gen, n, d=3, c=3, nStart=5):
         '''
@@ -287,13 +294,10 @@ class Author:
             return self
 
 
-    def forget(self, n=10):
+    def forget(self):
         '''
         This function will update and Author object's network and forget nodes that havent
         been viewed recently
-
-        Inputs:
-        thr      the number of nodes to remove
         '''
 
         # normalize memory
@@ -302,7 +306,9 @@ class Author:
         p = p*f
         p = 1. - p
         p = p/sum(p)
-        to_del = np.random.choice(list(self.memory.keys()), p=p, size=(n,), replace=False)
+        # draw number of authors
+        n = np.random.exponential(self.forget_bias, size=(1,))
+        to_del = np.random.choice(list(self.memory.keys()), p=p, size=(np.rint(n[0]).astype(int),), replace=False)
         # remove from network and memory
         for i in to_del:
             self.memory.pop(i)
