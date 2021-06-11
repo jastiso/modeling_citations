@@ -336,9 +336,13 @@ def compare_nets(a1,a2,method='soc'):
         raise Exception('You muse enter a valid comparison method')
 
     if method == 'soc':
+        # find nonzero nodes
+        id1 = [x for x in a1.memory.keys() if a1.memory[x] > 0]
+        id2 = [x for x in a2.memory.keys() if a2.memory[x] > 0]
+
         # get node identities
-        n1 = a1.network.vs['oid']
-        n2 = a2.network.vs['oid']
+        n1 = a1.network.vs(id1)['oid']
+        n2 = a2.network.vs(id2)['oid']
 
         # compare node identities
         meet12 = sum([x in n2 for x in n1])/len(n1) > a1.meet_bias
@@ -346,7 +350,8 @@ def compare_nets(a1,a2,method='soc'):
 
     else:
         bias_diff = (np.abs(a1.network_bias - a2.network_bias) + np.abs(a1.walk_bias - a2.walk_bias) +
-                    np.abs(a1.meet_bias - a2.meet_bias) + np.abs(np.log(a1.learn_bias) - np.log(a2.learn_bias)))/4
+                    np.abs(a1.meet_bias - a2.meet_bias) + np.abs(np.log(a1.learn_bias) - np.log(a2.learn_bias))
+                    + np.abs(np.log(a1.forget_bias) - np.log(a2.forget_bias)))/5
         meet12 = bias_diff < a1.meet_bias
         meet21 = bias_diff < a2.meet_bias
 
