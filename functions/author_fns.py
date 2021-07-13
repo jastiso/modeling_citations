@@ -186,7 +186,8 @@ class Author:
         if n < 1:
             raise Exception('N should be an integer greter than 0')
         if len(self.network.vs.select(_degree_gt = 1)) == 0:
-            raise Exception('Your network is disconnected - something went wrong with your network intialization')
+            print(self.network.summary())
+            raise Exception('Your network is fully disconnected - something went wrong with your network intialization, or you are forgetting too many nodes')
 
         # initialize
         bib = {}
@@ -248,7 +249,7 @@ class Author:
         unodes = list(set(nodes))
         sg = g.subgraph(g.vs(unodes))
         if len(sg.clusters()) > 1:
-            raise Exception("Something went wrong, your walk is disconnected")
+            raise Exception("Something went wrong, your walk and graph probably don't match")
         A = sg.get_adjacency()
         A = np.array(A.data)
         An = np.divide(A,A.sum(0))
@@ -349,9 +350,7 @@ def compare_nets(a1,a2,method='soc'):
         meet21 = sum([x in n1 for x in n2])/len(n2) > a2.meet_bias
 
     else:
-        bias_diff = (np.abs(a1.network_bias - a2.network_bias) + np.abs(a1.walk_bias - a2.walk_bias) +
-                    np.abs(a1.meet_bias - a2.meet_bias) + np.abs(np.log(a1.learn_bias) - np.log(a2.learn_bias))
-                    + np.abs(np.log(a1.forget_bias) - np.log(a2.forget_bias)))/5
+        bias_diff = (np.abs(a1.network_bias - a2.network_bias) + np.abs(a1.walk_bias - a2.walk_bias))/2
         meet12 = bias_diff < a1.meet_bias
         meet21 = bias_diff < a2.meet_bias
 
