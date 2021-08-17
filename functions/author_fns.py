@@ -346,8 +346,8 @@ def compare_nets(a1,a2,method='soc'):
         n2 = a2.network.vs(id2)['oid']
 
         # compare node identities
-        meet12 = sum([x in n2 for x in n1])/len(n1) > a1.meet_bias
-        meet21 = sum([x in n1 for x in n2])/len(n2) > a2.meet_bias
+        meet12 = sum([x in n2 for x in n1])/len(n1) >= a1.meet_bias
+        meet21 = sum([x in n1 for x in n2])/len(n2) >= a2.meet_bias
 
     else:
         bias_diff = (np.abs(a1.network_bias - a2.network_bias) + np.abs(a1.walk_bias - a2.walk_bias))/2
