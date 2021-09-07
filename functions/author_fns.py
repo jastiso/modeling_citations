@@ -42,8 +42,8 @@ class Author:
             raise Exception('Beta should be positive')
         if (forget_bias < 0.):
             raise Exception('forget_bias should be positive')
-        if (meet_bias < 0.) | (meet_bias > 1.):
-            raise Exception('Meeting bias should be between 0 and 1')
+        if (meet_bias < -1.) | (meet_bias > 1.):
+            raise Exception('Meeting bias should be between -1 and 1')
         if (network_bias < 0.) | (network_bias > 1.):
             raise Exception('Network bias should be between 0 and 1')
         if (walk_bias < 0.) | (walk_bias > 1.):
@@ -295,10 +295,13 @@ class Author:
             return self
 
 
-    def forget(self):
+    def forget(self, n=None):
         '''
         This function will update and Author object's network and forget nodes that havent
         been viewed recently
+
+        Inputs:
+        n (optional): a scalar determining how many individuals to forget
         '''
 
         # normalize memory
@@ -307,8 +310,10 @@ class Author:
         p = p*f
         p = 1. - p
         p = p/sum(p)
-        # draw number of authors
-        n = np.random.exponential(self.forget_bias, size=(1,))
+        # get number to forget
+        if n is None:
+            # draw number of authors
+            n = np.random.exponential(self.forget_bias, size=(1,))
         to_del = np.random.choice(list(self.memory.keys()), p=p, size=(np.rint(n[0]).astype(int),), replace=False)
         # remove from network and memory
         for i in to_del:
@@ -346,12 +351,27 @@ def compare_nets(a1,a2,method='soc'):
         n2 = a2.network.vs(id2)['oid']
 
         # compare node identities
-        meet12 = sum([x in n2 for x in n1])/len(n1) >= a1.meet_bias
-        meet21 = sum([x in n1 for x in n2])/len(n2) >= a2.meet_bias
+        if a1.meet_bias >= 0:
+            meet12 = sum([x in n2 for x in n1])/len(n1) >= a1.meet_bias
+        else:
+            meet12 = sum([x in n2 for x in n1])/len(n1) - 1 <= a1.meet_bias
+        if a2.meet_bias > 0:
+            meet21 = sum([x in n1 for x in n2])/len(n2) >= a2.meet_bias
+        else:
+            meet21 = sum([x in n1 for x in n2])/len(n2) - 1 <= a2.meet_bias
+            
+        
+
 
     else:
         bias_diff = (np.abs(a1.network_bias - a2.network_bias) + np.abs(a1.walk_bias - a2.walk_bias))/2
-        meet12 = bias_diff < a1.meet_bias
-        meet21 = bias_diff < a2.meet_bias
+        if a1.meet_bias > 0:
+            meet12 = bias_diff <= a1.meet_bias
+        else:
+            meet12 = bias_diff >= a1.meet_bias
+        if a2.meet_bias > 0:
+            meet21 = bias_diff <= a2.meet_bias
+        else:
+            meet21 = bias_diff >= a2.meet_bias
 
     return meet12, meet21
