@@ -192,9 +192,6 @@ class Author:
         # initialize
         bib = {}
 
-        # useful constants
-        nNode = len(self.network.vs())
-
         if start == None:
             # make sure the starting node is connected to something
             start = np.random.choice(self.network.vs.select(_degree_gt = 1)).index
@@ -303,7 +300,6 @@ class Author:
         Inputs:
         n (optional): a scalar determining how many individuals to forget
         '''
-
         # normalize memory
         p = np.array(list(self.memory.values()))
         f = 1./sum(p)
@@ -314,7 +310,8 @@ class Author:
         if n is None:
             # draw number of authors
             n = np.random.exponential(self.forget_bias, size=(1,))
-        to_del = np.random.choice(list(self.memory.keys()), p=p, size=(np.rint(n[0]).astype(int),), replace=False)
+            n = np.rint(n[0]).astype(int)
+        to_del = np.random.choice(list(self.memory.keys()), p=p, size=(n,), replace=False)
         # remove from network and memory
         for i in to_del:
             self.memory.pop(i)
