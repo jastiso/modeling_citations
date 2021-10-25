@@ -2,7 +2,7 @@ import numpy as np
 import igraph
 
 class Author:
-    def __init__(self, network_bias:float, walk_bias:float, meet_bias:float, beta:float, forget_bias:float, gender='W'):
+    def __init__(self, network_bias:float, walk_bias:float, meet_bias:float, beta:float, forget_bias=0.0, gender='W'):
         '''
         Inputs:
             gender          string, 'W' or 'M'
