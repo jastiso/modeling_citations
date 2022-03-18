@@ -356,8 +356,8 @@ def compare_nets(a1,a2,method='soc'):
             meet21 = sum([x in n1 for x in n2])/len(n2) >= a2.meet_bias
         else:
             meet21 = sum([x in n1 for x in n2])/len(n2) - 1 <= a2.meet_bias
-            
-        
+
+
 
 
     else:
@@ -372,3 +372,167 @@ def compare_nets(a1,a2,method='soc'):
             meet21 = bias_diff >= a2.meet_bias
 
     return meet12, meet21
+
+# group meeting function
+def group_meet(n, auths, idx, meets_per_year):
+    curr_meets = {}
+    for m in range(meets_per_year):
+        for j in range(int(n)):
+            # pick author for meeting
+            k = np.random.choice(idx)
+
+            # check if at least one will meet
+            [m12,m21] = compare_nets(auths[j], auths[k], meet_method)
+            a1_size = auths[j].network.vcount()
+            a2_size = auths[k].network.vcount()
+            if any([m12,m21]):
+                # if yes, update the network
+                if m12:
+                    bib = auths[k].get_cites(bib_length)
+                    auths[j].update_network(bib, auths[k].network, learn_thr)
+                    # forget
+                    auths[j].forget(n=auths[j].network.vcount()-a1_size)
+                if m21:
+                    bib = auths[j].get_cites(bib_length)
+                    auths[k].update_network(bib, auths[j].network, learn_thr)
+                    # forget
+                    auths[k].forget(n=auths[k].network.vcount()-a2_size)
+            # log information
+            # update meets
+            if m == 0:
+                curr_meets[j] = {'gender1': auths[j].gender, 'gender2':auths[k].gender, 'meet12':m12, 'meet21':m21}
+
+    curr_auths = [auths[x] for x in idx]
+    w_index = [a.gender == 'W' for a in curr_auths]
+    m_index = [not(x) for x in w_index]
+    # get network size
+    net_size = (np.mean([len(a.memory) for a in curr_auths]),np.std([len(a.memory) for a in curr_auths]))
+    # update cites
+    bibs = [a.get_cites(bib_length) for a in curr_auths]
+    bibs_w = [b for i,b in enumerate(bibs) if w_index[i]]
+    bibs_m = [b for i,b in enumerate(bibs) if m_index[i]]
+
+    return curr_meets, net_size, bibs, bibs_w, bibs_m
+
+# inside of parameter sweeps for paralelizing
+def param_sweep(o_auths, param, p, alt_dist=None, ind=None):
+    authors = o_auths.copy()
+    for i,a in enumerate(authors):
+        if param == 'walk':
+            if a.gender == 'M':
+                # make sure we dont go outside the range
+                wb = 1.2
+                while (wb > 1) | (wb < 0):
+                    wb = np.random.normal(loc=p,scale=walk_m[1],size=1)[0]
+                a.walk_bias = wb
+        elif param == 'meet':
+            if a.gender == 'M':
+                a.meet_bias = np.random.normal(loc=p,scale=alt_dist[ind],size=1)[0]
+        elif param == 'cds':
+            thr = np.random.normal(0,1,1)
+            if (a.gender == 'M') & (thr[0] <= p):
+                wb = 1.2
+                while (wb > 1) | (wb < 0):
+                    wb = skewnorm.rvs(10, loc=0.6,scale=0.1,size=1)[0]
+                a.walk_bias = wb
+                a.meet_bias = np.random.normal(loc=0.01,scale=0.0005,size=1)[0]
+
+    # run simulation
+    data = []
+    for i,b in tqdm(enumerate(range(nYears))):
+        #cProfile.run("tmp = group_meet(sim_params[i]['n'], authors, sim_params[i]['author_idx'])")
+        tmp = group_meet(sim_params[i]['n'], authors, sim_params[i]['author_idx'], meets_per_year)
+        data.append(tmp)
+        del tmp
+
+    # intialize final data structs
+    meets = {}; # keep track of when meetings were successful
+    net_size = []
+    bibs = {}
+    bibs_w = {}
+    bibs_m = {}
+    cite_perc = []
+    percs = [x['woman_perc'] for x in sim_params.values()]
+
+    # reformat data
+    cite_data = pd.DataFrame(columns=['perc','gen','time'])
+    prac_data = pd.DataFrame(columns=['prac','time','gen','citer'])
+    for i,d in enumerate(data):
+        curr_meets, ns, bs, bws, bms = d
+        curr_meets = dict(zip(np.array(list(curr_meets.keys()))+((i)*nAuth),curr_meets.values()))
+        meets.update(curr_meets)
+        net_size.append(ns)
+        bibs[i] = bs
+        bibs_w[i] = bws
+        bibs_m[i] = bms
+
+    # static data
+    static_perc = np.empty((nYears,len(bibs[nYears-1])))
+    static_perc[:] = np.NaN
+    static_perc_w = np.empty((nYears,len(bibs_w[nYears-1])))
+    static_perc_w[:] = np.NaN
+    static_perc_m = np.empty((nYears,len(bibs_m[nYears-1])))
+    static_perc_m[:] = np.NaN
+    for i,b in enumerate(bibs_w.values()):
+        # get all w authors citations at this time point
+        for j,p in enumerate(b):
+            # add to list
+            static_perc_w[i][j] = np.mean([cite['gender'] == 'woman' for cite in p.values()])
+
+    for i,b in enumerate(bibs_m.values()):
+        # get all m authors citations at this time point
+        for j,p in enumerate(b):
+            # add to list
+            static_perc_m[i][j] = np.mean([cite['gender'] == 'woman' for cite in p.values()])
+    statics.append({'wmu':np.nanmean(np.nanmean([(x-percs)/percs for x in static_perc_w.T],1)),
+                   'wstd':np.nanstd(np.nanmean([(x-percs)/percs for x in static_perc_w.T],1))/np.sqrt(len(np.nanmean([(x-percs)/percs for x in static_perc_w.T],1))),
+                   'mmu':np.nanmean(np.nanmean([(x-percs)/percs for x in static_perc_m.T],1)),
+                   'mstd':np.nanstd(np.nanmean([(x-percs)/percs for x in static_perc_m.T],1))/np.sqrt(len(np.nanmean([(x-percs)/percs for x in static_perc_m.T],1)))})
+
+    # time varying data
+    cite_data = pd.DataFrame(columns=['perc','gen','citer','time'])
+    for i,b in bibs.items():
+        curr_perc = (np.array([np.mean([cite['gender'] == 'woman' for cite in x.values()]) for x in b]) - percs[i])/percs[i]
+        tmp_data = pd.DataFrame({'perc': curr_perc,
+                                 'gen':['w']*len(curr_perc),
+                                 'citer':['all']*len(curr_perc),
+                                 'time':[i]*len(curr_perc)})
+        cite_data = pd.concat([cite_data,tmp_data])
+
+    for i,b in bibs_w.items():
+        curr_perc_w = (np.array([np.mean([cite['gender'] == 'woman' for cite in x.values()]) for x in b]) - percs[i])/percs[i]
+        curr_perc_m = (1 - (np.array([np.mean([cite['gender'] == 'woman' for cite in x.values()]) for x in b])) - (1 - percs[i]))/(1 - percs[i])
+
+        # womens citation by gender
+        gen = ['w']*len(curr_perc_w)
+        gen.extend(['m']*len(curr_perc_m))
+        tmp_data = pd.DataFrame({'perc': np.concatenate((curr_perc_w, curr_perc_m)),
+                                  'citer':['w']*(len(curr_perc_w)+len(curr_perc_m)),
+                                  'gen':gen,
+                                  'time':[i]*(len(curr_perc_w)+len(curr_perc_m))})
+        cite_data = pd.concat([cite_data,tmp_data])
+
+    for i,b in bibs_m.items():
+        curr_perc_w = (np.array([np.mean([cite['gender'] == 'woman' for cite in x.values()]) for x in b]) - percs[i])/percs[i]
+        curr_perc_m = (1 - (np.array([np.mean([cite['gender'] == 'woman' for cite in x.values()]) for x in b])) - (1 - percs[i]))/(1 - percs[i])
+
+        # mens citation by gender
+        gen = ['w']*len(curr_perc_w)
+        gen.extend(['m']*len(curr_perc_m))
+        tmp_data = pd.DataFrame({'perc': np.concatenate((curr_perc_w, curr_perc_m)),
+                                 'gen':gen,
+                                 'citer':['m']*(len(curr_perc_w)+len(curr_perc_m)),
+                                 'time':[i]*(len(curr_perc_w)+len(curr_perc_m))})
+        cite_data = pd.concat([cite_data,tmp_data])
+    X = sm.add_constant(range(nYears))
+    yw = cite_data[(cite_data['citer'] == 'w') & (cite_data['gen'] == 'w')].groupby('time').mean().values
+    modw = sm.OLS(yw, X)
+    resw = modw.fit()
+    ym = cite_data[(cite_data['citer'] == 'm') & (cite_data['gen'] == 'w')].groupby('time').mean().values
+    modm = sm.OLS(ym, X)
+    resm = modm.fit()
+    slopes.append({'wslope':resw.params[1],
+                 'wci':resw.conf_int(0.05)[1],
+                 'mslope':resm.params[1],
+                 'mci':resm.conf_int(0.05)[1]})
+    return slopes, statics
