@@ -374,7 +374,7 @@ def compare_nets(a1,a2,method='soc'):
     return meet12, meet21
 
 # group meeting function
-def group_meet(n, auths, idx, meets_per_year):
+def group_meet(n, auths, idx, meets_per_year, meet_method='soc', bib_length=70, learn_thr=0.1):
     curr_meets = {}
     for m in range(meets_per_year):
         for j in range(int(n)):
@@ -415,7 +415,7 @@ def group_meet(n, auths, idx, meets_per_year):
     return curr_meets, net_size, bibs, bibs_w, bibs_m
 
 # inside of parameter sweeps for paralelizing
-def param_sweep(o_auths, param, p, alt_dist=None, ind=None):
+def param_sweep(o_auths, param, p, alt_dist=None, ind=None, meet_method='soc', bib_length=70, learn_thr=0.1):
     authors = o_auths.copy()
     for i,a in enumerate(authors):
         if param == 'walk':
